@@ -1,4 +1,5 @@
 import logging
+from functools import wraps
 import os
 
 def setup_logger(name, log_file, level=logging.INFO):
@@ -28,6 +29,8 @@ def log_message(message, level='info'):
 
 def handle_error(func):
     """Decorador para manejar errores de manera uniforme"""
+    
+    @wraps(func)  # Usamos @wraps para mantener el nombre, docstring y metadata de la función decorada
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
