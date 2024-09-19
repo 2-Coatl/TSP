@@ -1,7 +1,5 @@
-from modules.utils import handle_error, log_message
 import openai
-
-openai.api_key = 'TU_API_KEY'
+from src.utils.logger import log_message, handle_error
 
 @handle_error
 def translate_text(text):

@@ -1,16 +1,8 @@
 import logging
 import os
 
-def save_translation_to_file(text, output_path):
-    """Guarda el texto traducido en un archivo."""
-    try:
-        with open(output_path, 'w') as file:
-            file.write(text)
-    except Exception as e:
-        raise RuntimeError(f"Error al guardar el archivo: {str(e)}")
-
 def setup_logger(name, log_file, level=logging.INFO):
-    """Configura el logger con un formato estándar"""
+    """Configura el logger con un formato estándar."""
     os.makedirs('logs', exist_ok=True)
     log_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     
@@ -22,9 +14,6 @@ def setup_logger(name, log_file, level=logging.INFO):
     logger.addHandler(handler)
     
     return logger
-
-# Ejemplo de uso global en otros módulos
-logger = setup_logger('app_logger', 'logs/app.log')
 
 def log_message(message, level='info'):
     """Función para loggear mensajes a lo largo del proyecto"""
