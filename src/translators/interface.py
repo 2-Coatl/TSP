@@ -1,8 +1,11 @@
-class Translator:
+from abc import ABC, abstractmethod
+
+class ITranslator(ABC):
     """Interfaz para un traductor."""
     
+    @abstractmethod
     def translate(self, text: str) -> str:
-        """Método abstracto que todas las implementaciones deben sobreescribir.
+        """Método abstracto que todas las implementaciones deben sobrescribir.
         
         Args:
             text (str): El texto que se va a traducir.
@@ -10,4 +13,4 @@ class Translator:
         Returns:
             str: El texto traducido.
         """
-        raise NotImplementedError("Esta es una interfaz. Las subclases deben implementar el método translate.")
+        pass

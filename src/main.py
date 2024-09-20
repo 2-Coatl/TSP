@@ -6,27 +6,31 @@ from src.utils.logger import log_message
 
 
 def main():
-    logger = setup_logger('app_logger', LOGS_DIR/LOG_FILE)
-    log_message("Iniciando la aplicación", level='info')
-    
-    # Crear una instancia del traductor
-    translator = GPTTranslator()  # Se puede cambiar a cualquier otra implementación de Translator en el futuro
+    # Configurar el logger
+    logger = LoggerManager('app_logger', 'logs/app.log')
 
-    # Ejemplo de archivo PDF
-    pdf_filename = FILES_DIR/'sample1.pdf'
+    # Clave API para el traductor
+    api_key = 'YOUR_OPENAI_API_KEY'
+    translator = GPTTranslator(api_key)
+
+    # Crear una instancia del extractor
+    pdf_extractor = PDFTextExtractor()
+
+    # Definir el nombre del archivo PDF y las páginas a extraer
+    pdf_filename = 'example.pdf'
+    start_page = 0
+    end_page = None  # Extraer hasta la última página
 
     # Extraer texto del PDF
-    try:
-        text_to_translate = extract_text_from_pdf(pdf_filename)
-        print(f"Texto extraído del PDF: {text_to_translate}")
-        
-        # Traducir el texto extraído
-        translated_text = translator.translate(text_to_translate)
-        print(f"Texto traducido: {translated_text}")
-        save_translation_to_file(translated_text, 'translated_output.txt')
-    except RuntimeError as e:
-        print(f"Ocurrió un error: {e}")
-    
+    extracted_texts = pdf_extractor.extract_text(pdf_filename, start_page, end_page)
 
-if __name__ == "__main__":
+    # Traducir cada texto extraído
+    for page_number, text in enumerate(extracted_texts, start=start_page):
+        if text.strip():  # Verificar que el texto no esté vacío
+            translated_text = translator.translate(text)
+            LoggerManager.log_message(f"Texto traducido de la página {page_number + 1}: {translated_text}", level='info')
+
+    LoggerManager.log_message("Proceso de extracción y traducción completado.", level='info')
+
+if __name__ == '__main__':
     main()

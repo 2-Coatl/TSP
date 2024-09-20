@@ -1,28 +1,34 @@
 import logging
 import os
 
-def setup_logger(name, log_file, level=logging.INFO):
-    """Configura el logger con un formato estándar."""
-    os.makedirs('logs', exist_ok=True)
-    log_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    
-    handler = logging.FileHandler(log_file)
-    handler.setFormatter(log_formatter)
-    
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
-    logger.addHandler(handler)
-    
-    return logger
+class LoggerManager:
+    _logger = None
 
-def log_message(message, level='info'):
-    """Función para loggear mensajes a lo largo del proyecto"""
-    if level == 'info':
-        logger.info(message)
-    elif level == 'warning':
-        logger.warning(message)
-    elif level == 'error':
-        logger.error(message)
-    else:
-        logger.debug(message)
+    @classmethod
+    def setup_logger(cls, name=None, log_file=None, level=logging.INFO):
+        """Configura el logger con un formato estándar."""
+        if cls._logger is None:  # Evitar configurar el logger más de una vez
+            if name is None:
+                name = 'app_logger'
+            if log_file is None:
+                log_file = 'logs/app.log'  # Puede ser configurado dinámicamente
 
+            os.makedirs(os.path.dirname(log_file), exist_ok=True)
+            cls._logger = logging.getLogger(name)
+            cls._logger.setLevel(level)
+            handler = logging.FileHandler(log_file)
+            formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+            handler.setFormatter(formatter)
+            cls._logger.addHandler(handler)
+
+    @classmethod
+    def log_message(cls, message, level='info'):
+        cls.setup_logger()  # Se puede configurar aquí si se desea un logger predeterminado
+        if level == 'info':
+            cls._logger.info(message)
+        elif level == 'warning':
+            cls._logger.warning(message)
+        elif level == 'error':
+            cls._logger.error(message)
+        else:
+            cls._logger.debug(message)
