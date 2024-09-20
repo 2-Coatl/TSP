@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  # Servicio de traducción
+  translation_service:
+    build: ./translation_service
+    container_name: translation_service
+    ports:
+      - "5001:5000"
+    environment:
+      - TRANSLATION_API_KEY=${TRANSLATION_API_KEY}
+      - STORAGE_SERVICE_URL=http://storage_service:5000
+    depends_on:
+      - storage_service
+
+  # Servicio de almacenamiento
+  storage_service:
+    build: ./storage_service
+    container_name: storage_service
+    ports:
+      - "5002:5000"
+    environment:
+      - STORAGE_PATH=/data
+    volumes:
+      - ./data:/data
+
+  # Servicio de notificación
+  notification_service:
+    build: ./notification_service
+    container_name: notification_service
+    ports:
+      - "5003:5000"
+    environment:
+      - NOTIFICATION_TYPE=email
+    depends_on:
+      - translation_service
+
+  # Opcionalmente, una cola de mensajes como RabbitMQ
+  rabbitmq:
+    image: "rabbitmq:3-management"
+    container_name: rabbitmq
+    ports:
+      - "5672:5672" # Puerto para los consumidores
+      - "15672:15672" # Puerto de la interfaz web de administración
