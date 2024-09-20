@@ -2,15 +2,19 @@ from src.extract.pdf_extractor import extract_text_from_pdf
 from src.translators.gpt_translator import GPTTranslator
 from src.utils.file_utils import save_translation_to_file
 from src.utils.config import LOG_FILE, LOGS_DIR, FILES_DIR
-from src.utils.logger import log_message
+from src.utils.logger import LoggerManager
+from src.utils.config import Settings
 
 
 def main():
+    # Cargar configuraciones
+    settings = Settings()
+
     # Configurar el logger
-    logger = LoggerManager('app_logger', 'logs/app.log')
+    logger = LoggerManager(settings.app_name, settings.log_file)
 
     # Clave API para el traductor
-    api_key = 'YOUR_OPENAI_API_KEY'
+    api_key = settings.api_key
     translator = GPTTranslator(api_key)
 
     # Crear una instancia del extractor
