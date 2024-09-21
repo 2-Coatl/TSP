@@ -8,9 +8,9 @@ services:
     ports:
       - "5001:5000"  # Este puerto podría eliminarse si no necesitas exponerlo externamente
     environment:
-      - TRANSLATION_API_KEY=${TRANSLATION_API_KEY:-default_api_key} # Usamos un valor por defecto si no está definido
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
       - STORAGE_SERVICE_URL=http://storage:5000
-      - REDIS_URL=redis://redis:6379/0  # Redis URL para manejar colas
+      - REDIS_URL=redis:${REDIS_URL}  # Redis URL para manejar colas
     depends_on:
       - storage
       - redis
@@ -24,10 +24,10 @@ services:
     ports:
       - "5002:5000"  # Este puerto podría eliminarse si no se necesita exponer externamente
     environment:
-      - STORAGE_PATH=/data
-      - DATABASE_URL=postgresql://user:password@db:5432/mydatabase  # PostgreSQL URL
+      - STORAGE_PATH=${STORAGE_PATH}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB} # PostgreSQL URL
     volumes:
-      - ./data:/data
+      - ./data:${STORAGE_PATH}
     depends_on:
       - db
     networks:
@@ -40,8 +40,8 @@ services:
     ports:
       - "5003:5000"  # Este servicio sí necesita exponer un puerto
     environment:
-      - NOTIFICATION_TYPE=email
-      - REDIS_URL=redis://redis:6379/0  # Redis URL para recibir eventos
+      - NOTIFICATION_TYPE=${NOTIFICATION_TYPE}
+      - REDIS_URL=${REDIS_URL}  # Redis URL para recibir eventos
     depends_on:
       - translation
       - redis
@@ -54,9 +54,9 @@ services:
     image: postgres:13
     container_name: postgres_db
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: mydatabase
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"  # Podrías eliminar este puerto si solo se necesita acceso interno
     volumes:
