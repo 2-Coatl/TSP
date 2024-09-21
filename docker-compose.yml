@@ -2,43 +2,96 @@ version: '3.8'
 
 services:
   # Servicio de traducción
-  translation_service:
-    build: ./translation_service
-    container_name: translation_service
+  translation:
+    build: ./translation
+    container_name: translation
     ports:
-      - "5001:5000"
+      - "5001:5000"  # Este puerto podría eliminarse si no necesitas exponerlo externamente
     environment:
-      - TRANSLATION_API_KEY=${TRANSLATION_API_KEY}
-      - STORAGE_SERVICE_URL=http://storage_service:5000
+      - TRANSLATION_API_KEY=${TRANSLATION_API_KEY:-default_api_key} # Usamos un valor por defecto si no está definido
+      - STORAGE_SERVICE_URL=http://storage:5000
+      - REDIS_URL=redis://redis:6379/0  # Redis URL para manejar colas
     depends_on:
-      - storage_service
+      - storage
+      - redis
+    networks:
+      - app_network
 
   # Servicio de almacenamiento
-  storage_service:
-    build: ./storage_service
-    container_name: storage_service
+  storage:
+    build: ./storage
+    container_name: storage
     ports:
-      - "5002:5000"
+      - "5002:5000"  # Este puerto podría eliminarse si no se necesita exponer externamente
     environment:
       - STORAGE_PATH=/data
+      - DATABASE_URL=postgresql://user:password@db:5432/mydatabase  # PostgreSQL URL
     volumes:
       - ./data:/data
+    depends_on:
+      - db
+    networks:
+      - app_network
 
-  # Servicio de notificación
-  notification_service:
-    build: ./notification_service
-    container_name: notification_service
+  # Servicio de notificación (con acceso externo)
+  notification:
+    build: ./notification
+    container_name: notification
     ports:
-      - "5003:5000"
+      - "5003:5000"  # Este servicio sí necesita exponer un puerto
     environment:
       - NOTIFICATION_TYPE=email
+      - REDIS_URL=redis://redis:6379/0  # Redis URL para recibir eventos
     depends_on:
-      - translation_service
+      - translation
+      - redis
+    networks:
+      - app_network
+      - external_network  # Este servicio también está en la red externa para recibir webhooks o notificaciones
 
-  # Opcionalmente, una cola de mensajes como RabbitMQ
+  # Base de datos PostgreSQL
+  db:
+    image: postgres:13
+    container_name: postgres_db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: mydatabase
+    ports:
+      - "5432:5432"  # Podrías eliminar este puerto si solo se necesita acceso interno
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app_network
+
+  # Redis para manejo de colas
+  redis:
+    image: redis:alpine
+    container_name: redis
+    ports:
+      - "6379:6379"  # Puede eliminarse si no necesitas acceso externo
+    networks:
+      - app_network
+
+  # RabbitMQ (opcional, expuesto externamente)
   rabbitmq:
     image: "rabbitmq:3-management"
     container_name: rabbitmq
     ports:
       - "5672:5672" # Puerto para los consumidores
       - "15672:15672" # Puerto de la interfaz web de administración
+    networks:
+      - app_network
+      - external_network  # RabbitMQ está expuesto también externamente para que pueda ser gestionado desde fuera
+
+# Definición de volúmenes persistentes
+volumes:
+  postgres_data:
+    driver: local
+
+# Definición de las redes
+networks:
+  app_network:
+    driver: bridge  # Red interna
+  external_network:
+    driver: bridge  # Red externa, para servicios que necesitan acceso desde fuera
