@@ -1,8 +1,8 @@
-import os
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Enum
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
+import os
 from utils.decorators import handle_error
 from utils.logger import LoggerManager
 
@@ -14,7 +14,7 @@ class Document(Base):
     id = Column(Integer, primary_key=True)
     filename = Column(String, nullable=False)
     file_path = Column(String, nullable=False)
-    translated_path = Column(String)  # New field for translated document path
+    translated_path = Column(String)
     file_size = Column(Integer, nullable=False)
     upload_date = Column(DateTime, default=datetime.utcnow)
     status = Column(Enum('uploaded', 'translating', 'translated', name='document_status'), default='uploaded')

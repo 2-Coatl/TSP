@@ -33,12 +33,16 @@ class StorageService:
         """
         LoggerManager.log_message(f"Storing translated text for document: {doc_id}")
         
+        # Obtener el documento original
+        original_doc = self.db_manager.get_document(doc_id)
+        if not original_doc:
+            raise ValueError(f"Document with ID {doc_id} not found")
+        
         # Guardar el texto traducido
-        translated_filename = f"translated_{doc_id}.txt"
-        translated_path = self.file_manager.save_file(translated_text.encode(), translated_filename)
+        translated_filename = f"translated_{os.path.basename(original_doc.file_path)}"
+        translated_path, _ = self.file_manager.save_file(translated_text, translated_filename)
         
         # Actualizar metadatos en PostgreSQL
-        self.db_manager.update_document_status(doc_id, 'translated')
         self.db_manager.update_document_translated_path(doc_id, translated_path)
         
         # Notificar al Servicio de Notificación
@@ -57,6 +61,8 @@ class StorageService:
             return {
                 'id': doc.id,
                 'filename': doc.filename,
+                'file_path': doc.file_path,
+                'translated_path': doc.translated_path,
                 'status': doc.status,
                 'source_language': doc.source_language,
                 'target_language': doc.target_language
@@ -74,7 +80,7 @@ class StorageService:
             LoggerManager.log_message(f"Document not found: {doc_id}", level='warning')
             return None
 
-        if translated and doc.status != 'translated':
+        if translated and not doc.translated_path:
             LoggerManager.log_message(f"Translated version not available for document: {doc_id}", level='warning')
             return None
 
