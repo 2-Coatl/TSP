@@ -4,6 +4,7 @@ from file_system import FileSystemManager
 from redis_client import RedisClient
 from utils.decorators import handle_error
 from utils.logger import LoggerManager
+from utils.config import REDIS_CHANNEL_NEW_DOCUMENT, REDIS_CHANNEL_TRANSLATION_COMPLETE
 
 class StorageService:
     def __init__(self):
@@ -21,7 +22,7 @@ class StorageService:
         doc_id = self.db_manager.add_document(filename, file_path, file_size, source_language, target_language)
         
         # Notificar al Servicio de Traducción
-        self.redis_client.publish('new_document_for_translation', str(doc_id))
+        self.redis_client.publish(REDIS_CHANNEL_NEW_DOCUMENT, str(doc_id))
         
         LoggerManager.log_message(f"PDF uploaded successfully. ID: {doc_id}")
         return doc_id
@@ -46,7 +47,7 @@ class StorageService:
         self.db_manager.update_document_translated_path(doc_id, translated_path)
         
         # Notificar al Servicio de Notificación
-        self.redis_client.publish('translation_complete', str(doc_id))
+        self.redis_client.publish(REDIS_CHANNEL_TRANSLATION_COMPLETE, str(doc_id))
         
         LoggerManager.log_message(f"Translated text stored for document: {doc_id}")
 

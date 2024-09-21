@@ -1,16 +1,16 @@
 version: '3.8'
-
 services:
   # Servicio de traducción
   translation:
     build: ./translation
     container_name: translation
     ports:
-      - "5001:5000"  # Este puerto podría eliminarse si no necesitas exponerlo externamente
+      - "5001:5000"  # Considerar eliminar si no se necesita acceso externo
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - STORAGE_SERVICE_URL=http://storage:5000
       - REDIS_URL=redis:${REDIS_URL}  # Redis URL para manejar colas
+      # - REDIS_URL=redis://redis:6379/${REDIS_DB:-0}
     depends_on:
       - storage
       - redis
@@ -22,32 +22,37 @@ services:
     build: ./storage
     container_name: storage
     ports:
-      - "5002:5000"  # Este puerto podría eliminarse si no se necesita exponer externamente
+      - "5002:5000"  # Considerar eliminar si no se necesita acceso externo
     environment:
       - STORAGE_PATH=${STORAGE_PATH}
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB} # PostgreSQL URL
+      - REDIS_URL=redis://redis:6379/${REDIS_DB:-0}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FILE=/app/logs/storage_service.log
+
     volumes:
       - ./data:${STORAGE_PATH}
+      - ./logs:/app/logs
     depends_on:
       - db
+      - redis
     networks:
       - app_network
 
-  # Servicio de notificación (con acceso externo)
+  # Servicio de notificación
   notification:
     build: ./notification
     container_name: notification
     ports:
-      - "5003:5000"  # Este servicio sí necesita exponer un puerto
+      - "5003:5000"
     environment:
       - NOTIFICATION_TYPE=${NOTIFICATION_TYPE}
-      - REDIS_URL=${REDIS_URL}  # Redis URL para recibir eventos
+      - REDIS_URL=redis://redis:6379/${REDIS_DB:-0}
     depends_on:
-      - translation
       - redis
     networks:
       - app_network
-      - external_network  # Este servicio también está en la red externa para recibir webhooks o notificaciones
+      - external_network
 
   # Base de datos PostgreSQL
   db:
@@ -57,8 +62,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-    ports:
-      - "5432:5432"  # Podrías eliminar este puerto si solo se necesita acceso interno
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -68,30 +71,26 @@ services:
   redis:
     image: redis:alpine
     container_name: redis
-    ports:
-      - "6379:6379"  # Puede eliminarse si no necesitas acceso externo
     networks:
       - app_network
 
-  # RabbitMQ (opcional, expuesto externamente)
+  # RabbitMQ (opcional)
   rabbitmq:
     image: "rabbitmq:3-management"
     container_name: rabbitmq
     ports:
-      - "5672:5672" # Puerto para los consumidores
-      - "15672:15672" # Puerto de la interfaz web de administración
+      - "5672:5672"  # Puerto para los consumidores
+      - "15672:15672"  # Puerto de la interfaz web de administración
     networks:
       - app_network
-      - external_network  # RabbitMQ está expuesto también externamente para que pueda ser gestionado desde fuera
+      - external_network
 
-# Definición de volúmenes persistentes
 volumes:
   postgres_data:
     driver: local
 
-# Definición de las redes
 networks:
   app_network:
-    driver: bridge  # Red interna
+    driver: bridge
   external_network:
-    driver: bridge  # Red externa, para servicios que necesitan acceso desde fuera
+    driver: bridge
