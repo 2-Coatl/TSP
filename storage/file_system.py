@@ -3,6 +3,7 @@ import shutil
 from datetime import datetime
 from utils.decorators import handle_error
 from utils.logger import LoggerManager
+from io import BytesIO
 
 class FileSystemManager:
     def __init__(self, base_path):
@@ -12,20 +13,29 @@ class FileSystemManager:
             LoggerManager.log_message(f"Created base path: {self.base_path}", level='info')
 
     @handle_error
-    def save_file(self, file, filename):
+    def save_file(self, file_or_content, filename):
         """
-        Guarda un archivo en el sistema de archivos.
+        Guarda un archivo o contenido en el sistema de archivos.
         
-        :param file: Objeto de archivo (generalmente un objeto tipo file-like de un framework web)
-        :param filename: Nombre original del archivo
+        :param file_or_content: Objeto de archivo, bytes, o string a guardar
+        :param filename: Nombre del archivo
         :return: (path del archivo guardado, tamaño del archivo)
         """
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
         safe_filename = f"{timestamp}_{filename}"
         file_path = os.path.join(self.base_path, safe_filename)
         
-        with open(file_path, 'wb') as buffer:
-            shutil.copyfileobj(file, buffer)
+        if isinstance(file_or_content, (str, bytes)):
+            # Si es un string o bytes, escribirlo directamente
+            mode = 'w' if isinstance(file_or_content, str) else 'wb'
+            with open(file_path, mode) as f:
+                f.write(file_or_content)
+        elif hasattr(file_or_content, 'read'):
+            # Si es un objeto tipo archivo, usar shutil para copiarlo
+            with open(file_path, 'wb') as buffer:
+                shutil.copyfileobj(file_or_content, buffer)
+        else:
+            raise ValueError("Unsupported file or content type")
         
         file_size = os.path.getsize(file_path)
         LoggerManager.log_message(f"File saved: {safe_filename}, Size: {file_size} bytes", level='info')
@@ -74,3 +84,19 @@ class FileSystemManager:
         files = [f for f in os.listdir(self.base_path) if os.path.isfile(os.path.join(self.base_path, f))]
         LoggerManager.log_message(f"Listed {len(files)} files in {self.base_path}", level='info')
         return files
+
+    @handle_error
+    def get_file_size(self, file_path):
+        """
+        Obtiene el tamaño de un archivo.
+        
+        :param file_path: Ruta completa al archivo
+        :return: Tamaño del archivo en bytes, o None si el archivo no existe
+        """
+        if os.path.exists(file_path):
+            size = os.path.getsize(file_path)
+            LoggerManager.log_message(f"File size retrieved for {file_path}: {size} bytes", level='info')
+            return size
+        else:
+            LoggerManager.log_message(f"File not found for size retrieval: {file_path}", level='warning')
+            return None

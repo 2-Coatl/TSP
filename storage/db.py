@@ -1,8 +1,10 @@
+import os
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Enum
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
-import os
+from utils.decorators import handle_error
+from utils.logger import LoggerManager
 
 Base = declarative_base()
 
@@ -12,6 +14,7 @@ class Document(Base):
     id = Column(Integer, primary_key=True)
     filename = Column(String, nullable=False)
     file_path = Column(String, nullable=False)
+    translated_path = Column(String)  # New field for translated document path
     file_size = Column(Integer, nullable=False)
     upload_date = Column(DateTime, default=datetime.utcnow)
     status = Column(Enum('uploaded', 'translating', 'translated', name='document_status'), default='uploaded')
@@ -24,9 +27,12 @@ class DatabaseManager:
         self.engine = create_engine(db_url)
         self.SessionLocal = sessionmaker(bind=self.engine)
 
+    @handle_error
     def create_tables(self):
         Base.metadata.create_all(self.engine)
+        LoggerManager.log_message("Database tables created", level='info')
 
+    @handle_error
     def add_document(self, filename, file_path, file_size, source_language, target_language):
         with self.SessionLocal() as session:
             new_doc = Document(
@@ -38,30 +44,47 @@ class DatabaseManager:
             )
             session.add(new_doc)
             session.commit()
+            LoggerManager.log_message(f"Document added to database: {filename}", level='info')
             return new_doc.id
 
+    @handle_error
     def get_document(self, doc_id):
         with self.SessionLocal() as session:
-            return session.query(Document).filter(Document.id == doc_id).first()
+            doc = session.query(Document).filter(Document.id == doc_id).first()
+            if doc:
+                LoggerManager.log_message(f"Retrieved document: {doc_id}", level='info')
+            else:
+                LoggerManager.log_message(f"Document not found: {doc_id}", level='warning')
+            return doc
 
+    @handle_error
     def update_document_status(self, doc_id, new_status):
         with self.SessionLocal() as session:
             doc = session.query(Document).filter(Document.id == doc_id).first()
             if doc:
-                new_doc = Document(
-                    filename=doc.filename,
-                    file_path=doc.file_path,
-                    file_size=doc.file_size,
-                    upload_date=doc.upload_date,
-                    status=new_status,
-                    source_language=doc.source_language,
-                    target_language=doc.target_language
-                )
-                session.add(new_doc)
+                doc.status = new_status
                 session.commit()
-                return new_doc.id
-            return None
+                LoggerManager.log_message(f"Updated document status: {doc_id} to {new_status}", level='info')
+                return True
+            LoggerManager.log_message(f"Failed to update document status: {doc_id}", level='warning')
+            return False
 
+    @handle_error
+    def update_document_translated_path(self, doc_id, translated_path):
+        with self.SessionLocal() as session:
+            doc = session.query(Document).filter(Document.id == doc_id).first()
+            if doc:
+                doc.translated_path = translated_path
+                doc.status = 'translated'
+                session.commit()
+                LoggerManager.log_message(f"Updated translated path for document: {doc_id}", level='info')
+                return True
+            LoggerManager.log_message(f"Failed to update translated path for document: {doc_id}", level='warning')
+            return False
+
+    @handle_error
     def get_documents_for_translation(self):
         with self.SessionLocal() as session:
-            return session.query(Document).filter(Document.status == 'uploaded').all()
+            docs = session.query(Document).filter(Document.status == 'uploaded').all()
+            LoggerManager.log_message(f"Retrieved {len(docs)} documents for translation", level='info')
+            return docs
