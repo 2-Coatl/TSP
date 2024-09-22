@@ -7,6 +7,8 @@ pip install -r requirements.txt
 Construir y levantar los contenedores
 
 docker compose up --build
+docker compose up --build --no-cache
+
 
 Verificar el estado
 docker compose logs -f
