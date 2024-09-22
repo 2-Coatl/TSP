@@ -1,5 +1,21 @@
 version: '3.8'
 services:
+  # Servicio de traducción
+  translation:
+    build: ./translation
+    container_name: translation
+    ports:
+      - "5001:5000"  # Considerar eliminar si no se necesita acceso externo
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - STORAGE_SERVICE_URL=http://storage:5000
+      - REDIS_URL=redis:${REDIS_URL}  # Redis URL para manejar colas
+      # - REDIS_URL=redis://redis:6379/${REDIS_DB:-0}
+    depends_on:
+      - storage
+      - redis
+    networks:
+      - app_network
 
   # Servicio de almacenamiento
   storage:
@@ -9,10 +25,11 @@ services:
       - "5002:5000"  # Considerar eliminar si no se necesita acceso externo
     environment:
       - STORAGE_PATH=${STORAGE_PATH}
-      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME} # PostgreSQL URL
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB} # PostgreSQL URL
       - REDIS_URL=redis://redis:6379/${REDIS_DB:-0}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - LOG_FILE=/app/logs/storage_service.log
+
     volumes:
       - ./data:${STORAGE_PATH}
       - ./logs:/app/logs
@@ -22,6 +39,21 @@ services:
     networks:
       - app_network
 
+  # Servicio de notificación
+  notification:
+    build: ./notification
+    container_name: notification
+    ports:
+      - "5003:5000"
+    environment:
+      - NOTIFICATION_TYPE=${NOTIFICATION_TYPE}
+      - REDIS_URL=redis://redis:6379/${REDIS_DB:-0}
+    depends_on:
+      - redis
+    networks:
+      - app_network
+      - external_network
+
   # Base de datos PostgreSQL
   db:
     image: postgres:13
@@ -30,12 +62,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./db-init:/docker-entrypoint-initdb.d
     networks:
       - app_network
 
@@ -56,17 +84,6 @@ services:
     networks:
       - app_network
       - external_network
-
-  # Adminer
-  adminer:
-    image: adminer
-    container_name: adminer
-    ports:
-      - "9090:8080"  # Puerto para acceder a Adminer
-    depends_on:
-      - db  # Asegura que db esté iniciado antes de Adminer
-    networks:
-      - app_network
 
 volumes:
   postgres_data:

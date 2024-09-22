@@ -6,10 +6,10 @@ pip install -r requirements.txt
 ---
 Construir y levantar los contenedores
 
-docker-compose up --build
+docker compose up --build
 
 Verificar el estado
-docker-compose logs -f
+docker compose logs -f
 
 Acceso a los servicios:
 
