@@ -13,7 +13,7 @@ load_dotenv()
 def initialize_services():
     """Inicializa y retorna todos los servicios necesarios."""
     db_manager = DatabaseManager()
-    file_manager = FileSystemManager(os.getenv('STORAGE_PATH', '/data'))
+    file_manager = FileSystemManager(os.getenv('STORAGE_PATH'))
     redis_client = RedisClient()
     storage_service = StorageService()
     return db_manager, file_manager, redis_client, storage_service
@@ -39,8 +39,8 @@ def setup_redis_listeners(redis_client, storage_service):
 
 def main():
     # Configurar el logger
-    log_file = os.getenv('LOG_FILE', 'logs/storage_service.log')
-    log_level = os.getenv('LOG_LEVEL', 'INFO')
+    log_file = os.getenv('LOG_FILE')
+    log_level = os.getenv('LOG_LEVEL')
     LoggerManager.setup_logger(name='storage_service', log_file=log_file, level=log_level)
 
     # Inicializar servicios

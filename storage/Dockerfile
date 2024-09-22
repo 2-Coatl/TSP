@@ -1,9 +1,11 @@
 # Usar una imagen base de Python
 FROM python:3.11-slim
 
-# Instala las dependencias necesarias para PostgreSQL
+# Instalar las dependencias necesarias para PostgreSQL y el cliente
 RUN apt-get update && apt-get install -y \
-    libpq-dev gcc
+    libpq-dev \
+    gcc \
+    postgresql-client
 
 # Establecer el directorio de trabajo
 WORKDIR /app
