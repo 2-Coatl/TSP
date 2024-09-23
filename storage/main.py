@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+from flask import Flask, jsonify
 from utils.logger import LoggerManager
 from storage import StorageService
 from db import DatabaseManager
@@ -10,13 +11,33 @@ from utils.config import REDIS_CHANNEL_NEW_DOCUMENT, REDIS_CHANNEL_TRANSLATION_C
 # Cargar variables de entorno
 load_dotenv()
 
+app = Flask(__name__)
+
+# Variables globales para los servicios
+db_manager = None
+file_manager = None
+redis_client = None
+storage_service = None
+
+
 def initialize_services():
     """Inicializa y retorna todos los servicios necesarios."""
+    global db_manager, file_manager, redis_client, storage_service
     db_manager = DatabaseManager()
     file_manager = FileSystemManager(os.getenv('STORAGE_PATH'))
     redis_client = RedisClient()
     storage_service = StorageService()
     return db_manager, file_manager, redis_client, storage_service
+
+
+@app.route('/health')
+def health_check():
+    # Verifica que todos los servicios estén operativos
+    if db_manager and file_manager and redis_client and storage_service:
+        # Puedes añadir más verificaciones aquí si es necesario
+        return jsonify({"status": "healthy"}), 200
+    else:
+        return jsonify({"status": "unhealthy"}), 500
 
 def setup_redis_listeners(redis_client, storage_service):
     """Configura los listeners de Redis para manejar eventos."""
@@ -44,7 +65,7 @@ def main():
     LoggerManager.setup_logger(name='storage_service', log_file=log_file, level=log_level)
 
     # Inicializar servicios
-    db_manager, file_manager, redis_client, storage_service = initialize_services()
+    initialize_services()
 
     # Crear tablas de la base de datos si no existen
     db_manager.create_tables()
@@ -53,6 +74,10 @@ def main():
     pubsub = setup_redis_listeners(redis_client, storage_service)
 
     LoggerManager.log_message("Servicio de Almacenamiento iniciado", level='info')
+
+    # Iniciar el servidor Flask en un hilo separado
+    from threading import Thread
+    Thread(target=lambda: app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)).start()
 
     # Mantener el servicio en ejecución
     try:

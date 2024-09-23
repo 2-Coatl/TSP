@@ -1,15 +1,12 @@
 version: '3.8'
 services:
-
   # Servicio de almacenamiento
   storage:
     build: ./storage
     container_name: storage
-    ports:
-      - "5002:5000"  # Considerar eliminar si no se necesita acceso externo
     environment:
       - STORAGE_PATH=${STORAGE_PATH}
-      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME} # PostgreSQL URL
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
       - REDIS_URL=redis://redis:6379/${REDIS_DB}
       - LOG_LEVEL=${LOG_LEVEL}
       - LOG_FILE=${LOG_FILE_STORAGE}
@@ -17,12 +14,42 @@ services:
       - ./data:${STORAGE_PATH}
       - ./logs:/app/logs
       - ./scripts:/scripts
+      - ./storage:/app
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     networks:
       - app_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     command: ["/scripts/wait-for-postgres.sh", "-h", "db", "-U", "${DB_USER}", "-P", "${DB_PASSWORD}", "-d", "${DB_NAME}", "-t", "60", "-i", "5", "--", "python", "main.py"]
+
+  # Servicio para pruebas
+  test:
+    build: 
+      context: ./storage
+      dockerfile: Dockerfile
+    container_name: storage_test
+    volumes:
+      - ./storage:/app
+    depends_on:
+      storage:
+        condition: service_healthy
+    environment:
+      - TESTING=True
+      # Incluye estas variables solo si tus pruebas las necesitan
+      # - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+      # - REDIS_URL=redis://redis:6379/${REDIS_DB}
+    networks:
+      - app_network
+    #command: ["pytest", "-v", "/app/tests", "--import-mode=importlib"]
+    command: ["python", "-m", "pytest", "-v", "/app/tests"]
 
   # Base de datos PostgreSQL
   db:
@@ -40,6 +67,11 @@ services:
       - ./db-init:/docker-entrypoint-initdb.d
     networks:
       - app_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   # Redis para manejo de colas
   redis:
@@ -55,8 +87,8 @@ services:
     image: "rabbitmq:3-management"
     container_name: rabbitmq
     ports:
-      - "5672:5672"  # Puerto para los consumidores
-      - "15672:15672"  # Puerto de la interfaz web de administración
+      - "5672:5672" # Puerto para los consumidores
+      - "15672:15672" # Puerto de la interfaz web de administración
     networks:
       - app_network
       - external_network
@@ -66,9 +98,9 @@ services:
     image: adminer
     container_name: adminer
     ports:
-      - "9090:8080"  # Puerto para acceder a Adminer
+      - "9090:8080" # Puerto para acceder a Adminer
     depends_on:
-      - db  # Asegura que db esté iniciado antes de Adminer
+      - db
     networks:
       - app_network
 
