@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -e
 : '
 Este script se utiliza para cambiar la contraseña de un usuario en PostgreSQL.
 Haz el script ejecutable:  
