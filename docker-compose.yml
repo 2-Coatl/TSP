@@ -4,6 +4,8 @@ services:
   storage:
     build: ./storage
     container_name: storage
+    ports:
+      - "5002:5000"
     environment:
       - STORAGE_PATH=${STORAGE_PATH}
       - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
@@ -98,7 +100,7 @@ services:
     image: adminer
     container_name: adminer
     ports:
-      - "9090:8080" # Puerto para acceder a Adminer
+      - "9090:8080"
     depends_on:
       - db
     networks:
