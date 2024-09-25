@@ -7,10 +7,10 @@ from utils.logger import LoggerManager
 from utils.config import REDIS_CHANNEL_NEW_DOCUMENT, REDIS_CHANNEL_TRANSLATION_COMPLETE
 
 class StorageService:
-    def __init__(self):
-        self.db_manager = DatabaseManager()
-        self.file_manager = FileSystemManager(os.getenv('STORAGE_PATH', '/data'))
-        self.redis_client = RedisClient()
+    def __init__(self, db_manager=None, file_manager=None, redis_client=None):
+        self.db_manager = db_manager or DatabaseManager()
+        self.file_manager = file_manager or FileSystemManager(os.getenv('STORAGE_PATH'))
+        self.redis_client = redis_client or RedisClient()
 
     @handle_error
     def upload_pdf(self, file, filename, source_language, target_language):
@@ -20,10 +20,10 @@ class StorageService:
         LoggerManager.log_message(f"Uploading PDF: {filename}")
         file_path, file_size = self.file_manager.save_file(file, filename)
         doc_id = self.db_manager.add_document(filename, file_path, file_size, source_language, target_language)
-        
+
         # Notificar al Servicio de Traducción
         self.redis_client.publish(REDIS_CHANNEL_NEW_DOCUMENT, str(doc_id))
-        
+
         LoggerManager.log_message(f"PDF uploaded successfully. ID: {doc_id}")
         return doc_id
 
@@ -33,22 +33,22 @@ class StorageService:
         Paso 3: Almacenamiento del Documento Traducido
         """
         LoggerManager.log_message(f"Storing translated text for document: {doc_id}")
-        
+
         # Obtener el documento original
         original_doc = self.db_manager.get_document(doc_id)
         if not original_doc:
             raise ValueError(f"Document with ID {doc_id} not found")
-        
+
         # Guardar el texto traducido
         translated_filename = f"translated_{os.path.basename(original_doc.file_path)}"
         translated_path, _ = self.file_manager.save_file(translated_text, translated_filename)
-        
+
         # Actualizar metadatos en PostgreSQL
         self.db_manager.update_document_translated_path(doc_id, translated_path)
-        
+
         # Notificar al Servicio de Notificación
         self.redis_client.publish(REDIS_CHANNEL_TRANSLATION_COMPLETE, str(doc_id))
-        
+
         LoggerManager.log_message(f"Translated text stored for document: {doc_id}")
 
     @handle_error

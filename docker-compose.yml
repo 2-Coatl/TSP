@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   # Servicio de almacenamiento
   storage:
@@ -6,12 +5,9 @@ services:
     container_name: storage
     ports:
       - "5002:5000"
+    env_file: .env
     environment:
-      - STORAGE_PATH=${STORAGE_PATH}
-      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
-      - REDIS_URL=redis://redis:6379/${REDIS_DB}
-      - LOG_LEVEL=${LOG_LEVEL}
-      - LOG_FILE=${LOG_FILE_STORAGE}
+      - FLASK_ENV=${FLASK_ENV}
     volumes:
       - ./data:${STORAGE_PATH}
       - ./logs:/app/logs
@@ -30,11 +26,11 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
-    command: ["/scripts/wait-for-postgres.sh", "-h", "db", "-U", "${DB_USER}", "-P", "${DB_PASSWORD}", "-d", "${DB_NAME}", "-t", "60", "-i", "5", "--", "python", "main.py"]
+    command: ["/scripts/wait-for-postgres.sh", "-h", "db", "-U", "${DB_USER}", "-P", "${DB_PASSWORD}", "-d", "${DB_NAME}", "-t", "60", "-i", "5", "--", "python", "src/main.py"]
 
   # Servicio para pruebas
   test:
-    build: 
+    build:
       context: ./storage
       dockerfile: Dockerfile
     container_name: storage_test
@@ -45,25 +41,17 @@ services:
         condition: service_healthy
     environment:
       - TESTING=True
-      # Incluye estas variables solo si tus pruebas las necesitan
-      # - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
-      # - REDIS_URL=redis://redis:6379/${REDIS_DB}
+      - FLASK_ENV=testing
+    env_file: .env
     networks:
       - app_network
-    #command: ["pytest", "-v", "/app/tests", "--import-mode=importlib"]
     command: ["python", "-m", "pytest", "-v", "/app/tests"]
 
   # Base de datos PostgreSQL
   db:
     image: postgres:13
     container_name: postgres_db
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
+    env_file: .env
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./db-init:/docker-entrypoint-initdb.d
