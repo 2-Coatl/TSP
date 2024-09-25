@@ -1,97 +1,76 @@
-import os
-from db import DatabaseManager
-from file_system import FileSystemManager
-from redis_client import RedisClient
-from utils.decorators import handle_error
+from db.managers.document_manager import DocumentManager
 from utils.logger import LoggerManager
-from utils.config import REDIS_CHANNEL_NEW_DOCUMENT, REDIS_CHANNEL_TRANSLATION_COMPLETE
+from ..config import Config
 
 class StorageService:
-    def __init__(self, db_manager=None, file_manager=None, redis_client=None):
-        self.db_manager = db_manager or DatabaseManager()
-        self.file_manager = file_manager or FileSystemManager(os.getenv('STORAGE_PATH'))
-        self.redis_client = redis_client or RedisClient()
+    def __init__(self):
+        self.config = Config()
+        self.doc_manager = DocumentManager()
+        self.logger = LoggerManager(__name__)
 
-    @handle_error
-    def upload_pdf(self, file, filename, source_language, target_language):
-        """
-        Paso 1: Subida de PDF
-        """
-        LoggerManager.log_message(f"Uploading PDF: {filename}")
-        file_path, file_size = self.file_manager.save_file(file, filename)
-        doc_id = self.db_manager.add_document(filename, file_path, file_size, source_language, target_language)
+    def initialize_database(self):
+        try:
+            self.doc_manager.create_tables()
+            self.logger.log_message("Database tables created successfully", level='info')
+        except Exception as e:
+            self.logger.log_message(f"Error creating database tables: {str(e)}", level='error')
+            raise
 
-        # Notificar al Servicio de Traducción
-        self.redis_client.publish(REDIS_CHANNEL_NEW_DOCUMENT, str(doc_id))
+    def add_new_document(self, filename, file_path, file_size, source_language, target_language):
+        try:
+            doc_id = self.doc_manager.add_document(filename, file_path, file_size, source_language, target_language)
+            self.logger.log_message(f"New document added with ID: {doc_id}", level='info')
+            return doc_id
+        except Exception as e:
+            self.logger.log_message(f"Error adding new document: {str(e)}", level='error')
+            raise
 
-        LoggerManager.log_message(f"PDF uploaded successfully. ID: {doc_id}")
-        return doc_id
-
-    @handle_error
-    def store_translated_text(self, doc_id, translated_text):
-        """
-        Paso 3: Almacenamiento del Documento Traducido
-        """
-        LoggerManager.log_message(f"Storing translated text for document: {doc_id}")
-
-        # Obtener el documento original
-        original_doc = self.db_manager.get_document(doc_id)
-        if not original_doc:
-            raise ValueError(f"Document with ID {doc_id} not found")
-
-        # Guardar el texto traducido
-        translated_filename = f"translated_{os.path.basename(original_doc.file_path)}"
-        translated_path, _ = self.file_manager.save_file(translated_text, translated_filename)
-
-        # Actualizar metadatos en PostgreSQL
-        self.db_manager.update_document_translated_path(doc_id, translated_path)
-
-        # Notificar al Servicio de Notificación
-        self.redis_client.publish(REDIS_CHANNEL_TRANSLATION_COMPLETE, str(doc_id))
-
-        LoggerManager.log_message(f"Translated text stored for document: {doc_id}")
-
-    @handle_error
     def get_document(self, doc_id):
-        """
-        Obtener información del documento
-        """
-        LoggerManager.log_message(f"Retrieving document: {doc_id}")
-        doc = self.db_manager.get_document(doc_id)
-        if doc:
-            return {
-                'id': doc.id,
-                'filename': doc.filename,
-                'file_path': doc.file_path,
-                'translated_path': doc.translated_path,
-                'status': doc.status,
-                'source_language': doc.source_language,
-                'target_language': doc.target_language
-            }
-        LoggerManager.log_message(f"Document not found: {doc_id}", level='warning')
-        return None
+        try:
+            document = self.doc_manager.get_document(doc_id)
+            if document:
+                self.logger.log_message(f"Retrieved document with ID: {doc_id}", level='info')
+            else:
+                self.logger.log_message(f"Document with ID {doc_id} not found", level='warning')
+            return document
+        except Exception as e:
+            self.logger.log_message(f"Error retrieving document: {str(e)}", level='error')
+            raise
 
-    @handle_error
-    def get_document_content(self, doc_id, translated=False):
-        """
-        Obtener el contenido del documento (original o traducido)
-        """
-        doc = self.db_manager.get_document(doc_id)
-        if not doc:
-            LoggerManager.log_message(f"Document not found: {doc_id}", level='warning')
-            return None
+    def update_document_status(self, doc_id, new_status):
+        try:
+            success = self.doc_manager.update_document_status(doc_id, new_status)
+            if success:
+                self.logger.log_message(f"Updated status of document {doc_id} to {new_status}", level='info')
+            else:
+                self.logger.log_message(f"Failed to update status of document {doc_id}", level='warning')
+            return success
+        except Exception as e:
+            self.logger.log_message(f"Error updating document status: {str(e)}", level='error')
+            raise
 
-        if translated and not doc.translated_path:
-            LoggerManager.log_message(f"Translated version not available for document: {doc_id}", level='warning')
-            return None
+    def get_documents_for_translation(self, limit=10, offset=0):
+        try:
+            docs = self.doc_manager.get_documents_for_translation(limit, offset)
+            self.logger.log_message(f"Retrieved {len(docs)} documents for translation", level='info')
+            return docs
+        except Exception as e:
+            self.logger.log_message(f"Error retrieving documents for translation: {str(e)}", level='error')
+            raise
 
-        file_path = doc.translated_path if translated else doc.file_path
-        return self.file_manager.get_file(file_path)
+# Example usage
+if __name__ == "__main__":
+    storage_service = StorageService()
+    storage_service.initialize_database()
 
-    @handle_error
-    def get_documents_for_translation(self):
-        """
-        Obtener documentos pendientes de traducción
-        """
-        LoggerManager.log_message("Retrieving documents for translation")
-        return self.db_manager.get_documents_for_translation()
+    # Add a new document
+    doc_id = storage_service.add_new_document("example.txt", "/path/to/file", 1024, "en", "es")
+
+    # Retrieve the document
+    document = storage_service.get_document(doc_id)
+
+    # Update document status
+    storage_service.update_document_status(doc_id, "translating")
+
+    # Get documents for translation
+    docs_to_translate = storage_service.get_documents_for_translation(limit=10, offset=0)

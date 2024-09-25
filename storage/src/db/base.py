@@ -1,24 +1,40 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from contextlib import contextmanager
 from config import get_config
+from sqlalchemy.pool import QueuePool
 
-# Obtenemos la configuración
-config = get_config()
-
-# Creamos el engine de SQLAlchemy
-engine = create_engine(config.DATABASE_URL, pool_size=5, max_overflow=10)
-
-# Creamos una fábrica de sesiones
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# Creamos la clase Base para nuestros modelos
 Base = declarative_base()
 
-# Función para obtener una sesión de base de datos
+class BaseManager:
+    def __init__(self):
+        self.config = get_config()
+        self.engine = create_engine(
+            self.config.DATABASE_URL,
+            poolclass=QueuePool,
+            pool_size=5,
+            max_overflow=10
+        )
+        self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
+
+    @contextmanager
+    def get_session(self):
+        session = self.SessionLocal()
+        try:
+            yield session
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def create_tables(self):
+        Base.metadata.create_all(self.engine)
+
+# Función de utilidad para obtener una sesión de base de datos
 def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    manager = BaseManager()
+    with manager.get_session() as session:
+        yield session
