@@ -1,62 +1,68 @@
-import uvicorn
-from fastapi import FastAPI, HTTPException, Depends
-from pydantic import BaseModel
-from storage.src.storage_service import StorageService
-from storage.src.utils.config import Config
-from storage.src.utils.logger import LoggerManager
+from flask import Flask, request, jsonify
+from src.storage_service import StorageService
+from config import Config
+from src.utils.logger import LoggerManager
 
-app = FastAPI()
+app = Flask(__name__)
 config = Config()
 logger = LoggerManager(__name__)
 storage_service = StorageService()
 
-class DocumentCreate(BaseModel):
-    filename: str
-    file_path: str
-    file_size: int
-    source_language: str
-    target_language: str
-
-@app.on_event("startup")
-async def startup_event():
+@app.before_first_request
+def initialize_database():
     logger.log_message("Initializing database...", level='info')
     storage_service.initialize_database()
     logger.log_message("Database initialized successfully", level='info')
 
-@app.post("/documents/", response_model=int)
-async def create_document(document: DocumentCreate):
+@app.route('/documents/', methods=['POST'])
+def create_document():
     try:
+        data = request.json
         doc_id = storage_service.add_new_document(
-            document.filename,
-            document.file_path,
-            document.file_size,
-            document.source_language,
-            document.target_language
+            data['filename'],
+            data['file_path'],
+            data['file_size'],
+            data['source_language'],
+            data['target_language']
         )
-        return doc_id
+        return jsonify({"id": doc_id}), 201
+    except KeyError as e:
+        logger.log_message(f"Missing required field: {str(e)}", level='error')
+        return jsonify({"error": "Missing required field"}), 400
     except Exception as e:
         logger.log_message(f"Error creating document: {str(e)}", level='error')
-        raise HTTPException(status_code=500, detail="Internal server error")
+        return jsonify({"error": "Internal server error"}), 500
 
-@app.get("/documents/{doc_id}")
-async def get_document(doc_id: int):
+@app.route('/documents/<int:doc_id>', methods=['GET'])
+def get_document(doc_id):
     document = storage_service.get_document(doc_id)
     if document is None:
-        raise HTTPException(status_code=404, detail="Document not found")
-    return document
+        return jsonify({"error": "Document not found"}), 404
+    return jsonify(document)
 
-@app.put("/documents/{doc_id}/status")
-async def update_document_status(doc_id: int, new_status: str):
+@app.route('/documents/<int:doc_id>/status', methods=['PUT'])
+def update_document_status(doc_id):
+    new_status = request.json.get('status')
+    if not new_status:
+        return jsonify({"error": "Status is required"}), 400
     success = storage_service.update_document_status(doc_id, new_status)
     if not success:
-        raise HTTPException(status_code=404, detail="Document not found")
-    return {"message": "Status updated successfully"}
+        return jsonify({"error": "Document not found"}), 404
+    return jsonify({"message": "Status updated successfully"})
 
-@app.get("/documents/for_translation")
-async def get_documents_for_translation(limit: int = 10, offset: int = 0):
-    return storage_service.get_documents_for_translation(limit, offset)
+@app.route('/documents/for_translation', methods=['GET'])
+def get_documents_for_translation():
+    limit = request.args.get('limit', default=10, type=int)
+    offset = request.args.get('offset', default=0, type=int)
+    documents = storage_service.get_documents_for_translation(limit, offset)
+    return jsonify(documents)
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    logger.log_message(f"Unhandled exception: {str(e)}", level='error')
+    return jsonify({"error": "Internal server error"}), 500
 
 if __name__ == "__main__":
     logger.log_message("Starting storage service...", level='info')
-    uvicorn.run("storage.src.main:app", host="0.0.0.0", port=8000, reload=True)
+    app.run(host="0.0.0.0", port=8000, debug=config.DEBUG)
     logger.log_message("Storage service stopped", level='info')
