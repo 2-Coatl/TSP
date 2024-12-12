@@ -15,12 +15,13 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copiar todo el contenido del directorio actual
 COPY . .
 
-# Define environment variable
+# Set environment variables
 ENV NAME StorageService
-# Dockerfile para las pruebas incluya el directorio del proyecto en PYTHONPATH
 ENV PYTHONPATH=/app:$PYTHONPATH
+ENV PYTHONUNBUFFERED 1
 
-# Comando para iniciar el servicio
-CMD ["python", "main.py"]
+# Cambiar al directorio padre de 'src' y ejecutar como módulo
+CMD ["python", "-m", "src.main"]

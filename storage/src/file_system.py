@@ -3,7 +3,7 @@ import shutil
 from datetime import datetime
 from utils.decorators import handle_error
 from utils.logger import LoggerManager
-from io import BytesIO
+
 
 class FileSystemManager:
     def __init__(self, base_path):
@@ -15,7 +15,7 @@ class FileSystemManager:
     def _get_directory_path(self, date=None):
         """
         Genera la ruta del directorio basada en la fecha.
-        
+
         :param date: Fecha para la cual generar la ruta (default: fecha actual)
         :return: Ruta del directorio
         """
@@ -27,7 +27,7 @@ class FileSystemManager:
     def save_file(self, file_or_content, filename):
         """
         Guarda un archivo o contenido en el sistema de archivos.
-        
+
         :param file_or_content: Objeto de archivo, bytes, o string a guardar
         :param filename: Nombre del archivo
         :return: (path del archivo guardado, tamaño del archivo)
@@ -35,10 +35,10 @@ class FileSystemManager:
         timestamp = datetime.now()
         dir_path = self._get_directory_path(timestamp)
         os.makedirs(dir_path, exist_ok=True)
-        
+
         safe_filename = f"{timestamp.strftime('%H%M%S')}_{filename}"
         file_path = os.path.join(dir_path, safe_filename)
-        
+
         if isinstance(file_or_content, (str, bytes)):
             mode = 'w' if isinstance(file_or_content, str) else 'wb'
             with open(file_path, mode) as f:
@@ -48,7 +48,7 @@ class FileSystemManager:
                 shutil.copyfileobj(file_or_content, buffer)
         else:
             raise ValueError("Unsupported file or content type")
-        
+
         file_size = os.path.getsize(file_path)
         LoggerManager.log_message(f"File saved: {file_path}, Size: {file_size} bytes", level='info')
         return file_path, file_size
@@ -57,7 +57,7 @@ class FileSystemManager:
     def get_file(self, file_path):
         """
         Recupera un archivo del sistema de archivos.
-        
+
         :param file_path: Ruta completa al archivo
         :return: Contenido del archivo o None si no existe
         """
@@ -74,7 +74,7 @@ class FileSystemManager:
     def delete_file(self, file_path):
         """
         Elimina un archivo del sistema de archivos.
-        
+
         :param file_path: Ruta completa al archivo a eliminar
         :return: True si se eliminó correctamente, False si no existía
         """
@@ -92,13 +92,14 @@ class FileSystemManager:
     def list_files(self, date=None):
         """
         Lista todos los archivos en el directorio especificado por la fecha.
-        
+
         :param date: Fecha para la cual listar los archivos (default: fecha actual)
         :return: Lista de rutas completas de archivos en el directorio
         """
         dir_path = self._get_directory_path(date)
         if os.path.exists(dir_path):
-            files = [os.path.join(dir_path, f) for f in os.listdir(dir_path) if os.path.isfile(os.path.join(dir_path, f))]
+            files = [os.path.join(dir_path, f) for f in os.listdir(dir_path) if
+                     os.path.isfile(os.path.join(dir_path, f))]
             LoggerManager.log_message(f"Listed {len(files)} files in {dir_path}", level='info')
             return files
         else:
@@ -109,7 +110,7 @@ class FileSystemManager:
     def get_file_size(self, file_path):
         """
         Obtiene el tamaño de un archivo.
-        
+
         :param file_path: Ruta completa al archivo
         :return: Tamaño del archivo en bytes, o None si el archivo no existe
         """
@@ -124,7 +125,7 @@ class FileSystemManager:
     def _cleanup_empty_dirs(self, path):
         """
         Elimina directorios vacíos recursivamente.
-        
+
         :param path: Ruta del directorio a verificar
         """
         if not os.path.isdir(path):
